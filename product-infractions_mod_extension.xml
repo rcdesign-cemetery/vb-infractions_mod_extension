@@ -1,0 +1,314 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+
+<product productid="infractions_mod_extension" active="1">
+	<title>Infractions Moderator Extension</title>
+	<description />
+	<version>0.1</version>
+	<url><![CDATA[http://www.vbulletin.org/forum/misc.php?do=productcheck&pid=infractions_mod_extension]]></url>
+	<versioncheckurl><![CDATA[http://www.vbulletin.org/forum/misc.php?do=productcheck&pid=infractions_mod_extension]]></versioncheckurl>
+	<apm_releasedate></apm_releasedate>
+	<apm_author></apm_author>
+	<apm_relatedurl></apm_relatedurl>
+	<apm_extrainfo></apm_extrainfo>
+	<apm_extraedit></apm_extraedit>
+	<dependencies>
+	</dependencies>
+	<codes>
+	</codes>
+	<templates>
+	</templates>
+	<stylevardfns>
+	</stylevardfns>
+	<stylevars>
+	</stylevars>
+	<plugins>
+		<plugin active="1" executionorder="5">
+			<title>Modify permissions to show infractions for all moderators</title>
+			<hookname>can_moderate_forum</hookname>
+			<phpcode><![CDATA[global $ime_can_moderate;
+
+// 7 - moderator group id
+if (is_member_of($vbulletin->userinfo,7) && $ime_can_moderate)
+{
+    if ($vbulletin->options['ime_show_deleted'])
+    {
+        $ime_scripts = array(
+            'forumdisplay',
+            'showthread',
+             'member',
+             'showpost'
+        );
+        
+        if (in_array(THIS_SCRIPT, $ime_scripts))
+        {
+            if (('' == $do) OR ('canmoderateposts' == $do)) 
+            {
+                $return = true;
+            }   
+            
+            if (THIS_SCRIPT == 'member')
+            {
+                if ('candeleteposts' == $do) 
+                {
+                    $return = true;
+                }
+            }        
+        }
+    }
+}]]></phpcode>
+		</plugin>
+		<plugin active="1" executionorder="5">
+			<title>Infractions daily cleanup</title>
+			<hookname>cron_script_cleanup_daily</hookname>
+			<phpcode><![CDATA[if (intval($vbulletin->options['ime_cleanup_period']))
+{
+    $ime_del_period= time() - $vbulletin->options['ime_cleanup_period']*24*60*60;
+    $ime_exclude_grp = unserialize($vbulletin->options['ime_cleanup_exclude_groups']);
+    $ime_exclude_string = '';
+    
+    if (!empty($ime_exclude_grp))
+    {
+        if (!$ime_exclude_grp[0])
+        {
+           unset($ime_exclude_grp[0]);
+        }
+        
+        if (count($ime_exclude_grp))
+        {
+            $ime_exclude_grp = implode(',', $ime_exclude_grp);
+            $ime_exclude_string = " AND user.usergroupid NOT IN(" .$ime_exclude_grp. ")";
+        }
+    } 
+    
+    $ime_query = "DELETE FROM " .TABLE_PREFIX. "infraction as infraction 
+        WHERE infraction.infractionid IN(
+        SELECT infraction.infractionid
+        FROM " .TABLE_PREFIX. "infraction as infraction
+        LEFT JOIN " .TABLE_PREFIX. "user as user ON infraction.userid = user.userid
+        WHERE
+        expires <" .$ime_del_period. "
+        AND expires !=0 " .$ime_exclude_string. " )";
+
+    $db->query_write($ime_query);
+}]]></phpcode>
+		</plugin>
+		<plugin active="1" executionorder="5">
+			<title>Disable can_moderate() patch (forumdisplay)</title>
+			<hookname>forumdisplay_complete</hookname>
+			<phpcode>global $ime_can_moderate;
+$ime_can_moderate = false;</phpcode>
+		</plugin>
+		<plugin active="1" executionorder="5">
+			<title>Make threads and posts visible to moderators.</title>
+			<hookname>forumdisplay_query_threadscount</hookname>
+			<phpcode><![CDATA[if ($vbulletin->options['ime_show_deleted'])
+{
+    // 7 - moderator group id
+    if (is_member_of($vbulletin->userinfo,7))
+    {
+        if (!can_moderate($forumid, 'canmoderateposts'))
+        {
+            $visiblethreads = " AND visible IN (1,2)";
+        }
+        else
+        {
+            $visiblethreads = " AND visible IN (0,1,2)";
+        }
+    }
+}]]></phpcode>
+		</plugin>
+		<plugin active="1" executionorder="5">
+			<title>Enable can_moderate() patch</title>
+			<hookname>global_bootstrap_init_start</hookname>
+			<phpcode>global $ime_can_moderate;
+$ime_can_moderate = true;</phpcode>
+		</plugin>
+		<plugin active="1" executionorder="5">
+			<title><![CDATA[Filter expired and reversed infractions and render what's left]]></title>
+			<hookname>member_infractionbit</hookname>
+			<phpcode><![CDATA[if ($vbulletin->options['ime_hide_infractions'])
+{
+	//check if the infraction is neither expired nor reversed
+    if ($infraction['action'] == 0)
+    {
+    	//vbulletin code for rendering infractions
+        $threadinfo = array(
+                    'threadid' => $infraction['threadid'],
+                    'title'    => $infraction['title'],
+                );
+        $pageinfo = array('p' => $infraction['postid']);
+        $memberinfo = array('userid' => $infraction['whoadded'], 'username' => $infraction['username']);   
+        $templater = vB_Template::create('memberinfo_infractionbit');
+        $templater->register('card', $card);
+        $templater->register('infraction', $infraction);
+        $templater->register('memberinfo', $memberinfo);
+        $templater->register('pageinfo', $pageinfo);
+        $templater->register('threadinfo', $threadinfo);
+        $ime_rendered_infractions .= $templater->render(); 
+    }
+}]]></phpcode>
+		</plugin>
+		<plugin active="1" executionorder="5">
+			<title>Change vbulletin infractions to filtered in userprofle</title>
+			<hookname>member_infraction_complete</hookname>
+			<phpcode><![CDATA[if ($vbulletin->options['ime_hide_infractions'])
+{
+    $this->block_data['infractionbits'] = $ime_rendered_infractions;
+}]]></phpcode>
+		</plugin>
+		<plugin active="1" executionorder="5">
+			<title>Remove pagination in user profile infraction block and initialize variable for rendering</title>
+			<hookname>member_infraction_start</hookname>
+			<phpcode><![CDATA[global $vbulletin;
+
+if ($vbulletin->options['ime_hide_infractions'])
+{
+    $ime_rendered_infractions = '';
+    $options['perpage'] = 100;
+}]]></phpcode>
+		</plugin>
+		<plugin active="1" executionorder="5">
+			<title>Limit moderator infractions</title>
+			<hookname>postbit_display_complete</hookname>
+			<phpcode><![CDATA[global $vbulletin;
+
+if ($vbulletin->options['ime_restrict_infractions'])
+{
+    if ($show['infractionlink'] && !can_moderate($this->registry->GPC['forumid']))
+    {
+        $show['infractionlink'] = false;
+    }
+}]]></phpcode>
+		</plugin>
+		<plugin active="1" executionorder="5">
+			<title>Fix to show details for deleted posts</title>
+			<hookname>postbit_display_complete</hookname>
+			<phpcode><![CDATA[// Workaround to show all info in "postbit_deleted" to moderators.
+// We can't touch $show['inlinemod'], this affect other controls.
+// So we play with $show['messageicon']
+
+global $vbulletin;
+global $ime_show_message_icon;
+
+//Saving flag state
+$ime_show_message_icon = $show['message_icon'];
+
+if ($vbulletin->options['ime_show_deleted'])
+{
+    // 7 - moderator group id
+    if (($post['visible'] == 2) && !$show['messageicon'] && is_member_of($vbulletin->userinfo,7))
+    {
+        $show['messageicon'] = true;
+    }
+}]]></phpcode>
+		</plugin>
+		<plugin active="1" executionorder="5">
+			<title>Disable can_moderate() patch (showpost)</title>
+			<hookname>showpost_start</hookname>
+			<phpcode>global $ime_can_moderate;
+$ime_can_moderate = false;</phpcode>
+		</plugin>
+		<plugin active="1" executionorder="5">
+			<title><![CDATA[Restore show['messageicon'] flag]]></title>
+			<hookname>showthread_postbit_create</hookname>
+			<phpcode><![CDATA[global $ime_show_message_icon;
+
+if (isset($ime_show_message_icon))
+{
+     $show['messageicon'] = $ime_show_message_icon;
+}]]></phpcode>
+		</plugin>
+		<plugin active="1" executionorder="5">
+			<title>Disable can_moderate() patch (showthread)</title>
+			<hookname>showthread_post_start</hookname>
+			<phpcode>global $ime_can_moderate;
+$ime_can_moderate = false;</phpcode>
+		</plugin>
+		<plugin active="1" executionorder="5">
+			<title>Change vbulletin infractions to filtered in usercp</title>
+			<hookname>usercp_complete</hookname>
+			<phpcode><![CDATA[if ($vbulletin->options['ime_hide_infractions'])
+{
+    $infractionbits = $ime_rendered_infractions;
+}]]></phpcode>
+		</plugin>
+		<plugin active="1" executionorder="5">
+			<title>Render filtered infractions in usercp</title>
+			<hookname>usercp_infractioninfobit</hookname>
+			<phpcode><![CDATA[if ($vbulletin->options['ime_hide_infractions'])
+{
+	// check if the infraction is neither expired nor reversed
+    if ($infraction['action'] == 0)
+    {
+    	//vbulletin code for rendering infractions
+        $pageinfo = array('p' => $infraction['postid']);
+        $templater = vB_Template::create('userinfraction_infobit');
+        $templater->register('card', $card);
+        $templater->register('infraction', $infraction);
+        $templater->register('pageinfo', $pageinfo);
+        $templater->register('threadinfo', $threadinfo);
+        $ime_rendered_infractions .= $templater->render();
+    }
+}]]></phpcode>
+		</plugin>
+		<plugin active="1" executionorder="5">
+			<title>Initialize variable for rendering filtered infractions</title>
+			<hookname>usercp_start</hookname>
+			<phpcode><![CDATA[if ($vbulletin->options['ime_hide_infractions'])
+{
+    $ime_rendered_infractions = '';
+}]]></phpcode>
+		</plugin>
+	</plugins>
+	<phrases>
+		<phrasetype name="vBulletin Settings" fieldname="vbsettings">
+			<phrase name="setting_ime_cleanup_exclude_groups_desc" date="1280501984" username="Vitaly" version="0.1"><![CDATA[Selected groups will keep infractions log forever, for historic reasons.]]></phrase>
+			<phrase name="setting_ime_cleanup_exclude_groups_title" date="1280501984" username="Vitaly" version="0.1"><![CDATA[Usergroup to exclude from cleanup]]></phrase>
+			<phrase name="setting_ime_cleanup_period_desc" date="1280501813" username="Vitaly" version="0.1"><![CDATA[Set cleanup period for inactive infractions. Leave empty to disable.]]></phrase>
+			<phrase name="setting_ime_cleanup_period_title" date="1280501813" username="Vitaly" version="0.1"><![CDATA[Infractions cleanup period (days)]]></phrase>
+			<phrase name="setting_ime_hide_infractions_desc" date="1280501926" username="Vitaly" version="0.1"><![CDATA[If set YES, only moderators/administrators will see full history, users will see only active infractions.]]></phrase>
+			<phrase name="setting_ime_hide_infractions_title" date="1280501926" username="Vitaly" version="0.1"><![CDATA[Hide inactive infractions from users]]></phrase>
+			<phrase name="setting_ime_restrict_infractions_desc" date="1280501598" username="Vitaly" version="0.1"><![CDATA[If set YES, then moderators can give infractions only in their forums.]]></phrase>
+			<phrase name="setting_ime_restrict_infractions_title" date="1280501598" username="Vitaly" version="0.1"><![CDATA[Restrict giving infractions on other forums]]></phrase>
+			<phrase name="setting_ime_show_deleted_desc" date="1280501723" username="Vitaly" version="0.1"><![CDATA[Show deleted posts/threads to moderators in all forums and all infractions links/titles in user profile.]]></phrase>
+			<phrase name="setting_ime_show_deleted_title" date="1280501723" username="Vitaly" version="0.1"><![CDATA[Show deleted posts/threads to moderators]]></phrase>
+			<phrase name="settinggroup_ime_setting_group" date="1279290706" username="ruseinov" version="0.1"><![CDATA[Infractions Mod Settings]]></phrase>
+		</phrasetype>
+	</phrases>
+	<options>
+		<settinggroup name="ime_setting_group" displayorder="65535">
+			<setting varname="ime_restrict_infractions" displayorder="30">
+				<datatype>free</datatype>
+				<optioncode>yesno</optioncode>
+				<defaultvalue>1</defaultvalue>
+			</setting>
+			<setting varname="ime_show_deleted" displayorder="40">
+				<datatype>free</datatype>
+				<optioncode>yesno</optioncode>
+				<defaultvalue>1</defaultvalue>
+			</setting>
+			<setting varname="ime_cleanup_period" displayorder="50">
+				<datatype>integer</datatype>
+				<defaultvalue>730</defaultvalue>
+			</setting>
+			<setting varname="ime_cleanup_exclude_groups" displayorder="60">
+				<datatype>free</datatype>
+				<optioncode>usergroup:6</optioncode>
+				<defaultvalue>a:1:{i:0;i:8;}</defaultvalue>
+			</setting>
+			<setting varname="ime_hide_infractions" displayorder="70">
+				<datatype>boolean</datatype>
+				<optioncode>yesno</optioncode>
+				<defaultvalue>1</defaultvalue>
+			</setting>
+		</settinggroup>
+	</options>
+	<helptopics>
+	</helptopics>
+	<cronentries>
+	</cronentries>
+	<faqentries>
+	</faqentries>
+	<templateedits>
+	</templateedits>
+</product>
