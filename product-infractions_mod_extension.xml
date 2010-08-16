@@ -62,11 +62,11 @@ if (is_member_of($vbulletin->userinfo,7) && $ime_can_moderate)
 			<hookname>cron_script_cleanup_daily</hookname>
 			<phpcode><![CDATA[if (intval($vbulletin->options['ime_cleanup_period']))
 {
-    $ime_del_period= time() - $vbulletin->options['ime_cleanup_period']*24*60*60;
+    $ime_del_period= TIMENOW - $vbulletin->options['ime_cleanup_period']*24*60*60;
     $ime_exclude_grp = unserialize($vbulletin->options['ime_cleanup_exclude_groups']);
     $ime_exclude_string = '';
     
-    if (!empty($ime_exclude_grp))
+    if (!empty($ime_exclude_grp) AND is_array($ime_exclude_grp))
     {
         if (!$ime_exclude_grp[0])
         {
@@ -80,16 +80,16 @@ if (is_member_of($vbulletin->userinfo,7) && $ime_can_moderate)
         }
     } 
     
-    $ime_query = "DELETE FROM " .TABLE_PREFIX. "infraction as infraction 
-        WHERE infraction.infractionid IN(
-        SELECT infraction.infractionid
-        FROM " .TABLE_PREFIX. "infraction as infraction
-        LEFT JOIN " .TABLE_PREFIX. "user as user ON infraction.userid = user.userid
-        WHERE
-        expires <" .$ime_del_period. "
-        AND expires !=0 " .$ime_exclude_string. " )";
+    $ime_query = 'DELETE 
+                        infraction 
+                    FROM 
+                        ' . TABLE_PREFIX . 'infraction AS infraction 
+                    LEFT JOIN ' . TABLE_PREFIX . 'user AS user ON infraction.userid = user.userid 
+                    WHERE
+                        expires < ' . $ime_del_period . ' AND
+                        expires !=0 ' . $ime_exclude_string;
 
-    $db->query_write($ime_query);
+    $vbulletin->db->query_write($ime_query);
 }]]></phpcode>
 		</plugin>
 		<plugin active="1" executionorder="5">
