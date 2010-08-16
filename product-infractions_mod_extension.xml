@@ -87,7 +87,7 @@ if (is_member_of($vbulletin->userinfo,7) && $ime_can_moderate)
                     LEFT JOIN ' . TABLE_PREFIX . 'user AS user ON infraction.userid = user.userid 
                     WHERE
                         expires < ' . $ime_del_period . ' AND
-                        expires !=0 ' . $ime_exclude_string;
+                        expires > 0 ' . $ime_exclude_string;
 
     $vbulletin->db->query_write($ime_query);
 }]]></phpcode>
