@@ -4,7 +4,7 @@
 	<title>Infractions Moderator Extension</title>
 	<description />
 	<version>0.1</version>
-	<url><![CDATA[http://www.vbulletin.org/forum/misc.php?do=productcheck&pid=infractions_mod_extension]]></url>
+	<url><![CDATA[http://www.vbulletin.org/forum/misc.php?do=producthelp&pid=infractions_mod_extension]]></url>
 	<versioncheckurl><![CDATA[http://www.vbulletin.org/forum/misc.php?do=productcheck&pid=infractions_mod_extension]]></versioncheckurl>
 	<apm_releasedate></apm_releasedate>
 	<apm_author></apm_author>
