@@ -6,11 +6,11 @@
 	<version>0.1</version>
 	<url><![CDATA[http://www.vbulletin.org/forum/misc.php?do=producthelp&pid=infractions_mod_extension]]></url>
 	<versioncheckurl><![CDATA[http://www.vbulletin.org/forum/misc.php?do=productcheck&pid=infractions_mod_extension]]></versioncheckurl>
-	<apm_releasedate></apm_releasedate>
-	<apm_author></apm_author>
-	<apm_relatedurl></apm_relatedurl>
-	<apm_extrainfo></apm_extrainfo>
-	<apm_extraedit></apm_extraedit>
+	<apm_releasedate>0</apm_releasedate>
+	<apm_author />
+	<apm_relatedurl />
+	<apm_extrainfo />
+	<apm_extraedit />
 	<dependencies>
 	</dependencies>
 	<codes>
@@ -151,7 +151,7 @@ $ime_can_moderate = true;</phpcode>
 		<plugin active="1" executionorder="5">
 			<title>Change vbulletin infractions to filtered in userprofle</title>
 			<hookname>member_infraction_complete</hookname>
-			<phpcode><![CDATA[if ($vbulletin->options['ime_hide_infractions'])
+			<phpcode><![CDATA[if ($vbulletin->options['ime_hide_infractions'] AND $this->profile->userinfo['userid'] == $this->registry->userinfo['userid'])
 {
     $this->block_data['infractionbits'] = $ime_rendered_infractions;
 }]]></phpcode>
